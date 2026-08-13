@@ -35,7 +35,7 @@ Auth examples in docs are fixtures for the self-check server, not a required API
 - **Diagnosis matrix** — happy, validation, auth, protocol, contract
 - **Fail-first HTML report** — scenario, purpose, expected, unexpected API result
 - **Secret redaction** — passwords, tokens, cookies, JWTs (`eyJ***`) stay out of chat and HTML
-- **Optional spec map** — OpenAPI, Swagger, or Postman JSON for a coverage note
+- **Optional spec map** — your OpenAPI, Swagger, or Postman JSON (URL or file) for a coverage note
 - **Optional UI probe** — Playwright screenshots when you name a page
 - **Brand stamp** — lockup image embedded as base64 so the HTML moves alone
 
@@ -74,32 +74,128 @@ If the host did not install Node dependencies:
 cd plugins/test-them && npm install
 ```
 
-## Quick start
+## Usage
 
-In the agent:
+Talk to the agent in the repo (or after the plugin is installed). The skill `/test-them` drives MCP. You do not call Node yourself unless you want a standalone server.
+
+### 1. Probe an API
 
 ```text
 test http://localhost:2054/auth/login with body {"username":"admin","password":"123123"}
 ```
 
-The agent reads the skill, calls MCP `diagnose`, then `render`. You get `reports/*.html`.
+What happens:
 
-Reply from the agent is only:
+1. Agent collects method, URL, headers, body you gave.
+2. MCP `diagnose` hits that URL live, then runs the validation / auth / protocol / contract matrix.
+3. MCP `render` writes `reports/<method>-<host-path>-<time>.html`.
+
+Agent reply is only:
 
 1. pass / fail counts
 2. up to 5 findings
 3. report path
 
-Optional:
+Do not ask it to invent status codes or mock the server.
 
-- pass a spec URL (`/docs-json`, Swagger, Postman) for a coverage note
-- name a browser page to attach Playwright screenshots (`ui_probe`)
-
-Stamp report ownership:
+With a spec (coverage note only, not a fuzzer). Pass the OpenAPI, Swagger, or Postman JSON **you actually have** (URL or file path). There is no default `/docs-json`.
 
 ```text
-configure({ brand: { name: "test them", owner: "Your Lab", product: "HTTP evidence", mark: "tt" } })
+load the spec at <your-openapi-or-postman-url-or-file> then diagnose POST <your-url>
 ```
+
+Subset of families:
+
+```text
+diagnose only happy and auth against POST http://localhost:2054/auth/login
+```
+
+### 2. Session setup
+
+Run once per chat if you need a base URL, default headers, or a brand stamp on the report.
+
+```text
+configure({
+  baseUrl: "http://localhost:2054",
+  headers: { "X-Request-Id": "lab-1" },
+  allowWrite: false,
+  timeoutMs: 15000,
+  brand: { name: "test them", owner: "Your Lab", product: "HTTP evidence", mark: "tt" }
+})
+```
+
+- `allowWrite` defaults `false`. Extra POST/PATCH/DELETE (not the seed URL you named) needs an explicit yes.
+- After a login case succeeds: `auth_from` copies a token (default path `data.accessToken`) into `Authorization`.
+
+One-off request without the matrix:
+
+```text
+call GET http://localhost:2054/health
+```
+
+### 3. Probe a page (UI)
+
+Only if you name a page, browser, screenshot, or UX check. Playwright is optional:
+
+```bash
+cd plugins/test-them && npm install playwright && npx playwright install chromium
+```
+
+Then in the agent:
+
+```text
+open http://localhost:3000/login in the browser
+expect to see "Welcome back"
+expect #email visible
+also run mobile
+```
+
+That maps to `ui_probe`:
+
+```text
+ui_probe({
+  url: "http://localhost:3000/login",
+  steps: [
+    { action: "fill", selector: "#email", value: "admin@example.com" },
+    { action: "click", selector: "button[type=submit]" },
+    { action: "wait", urlIncludes: "/dashboard" }
+  ],
+  expects: [
+    { kind: "seeText", text: "Welcome back" },
+    { kind: "visible", selector: "#email" },
+    { kind: "titleIncludes", text: "Sign" },
+    { kind: "urlIncludes", text: "/login" }
+  ],
+  viewports: ["desktop", "mobile"],
+  attach: true
+})
+```
+
+Then `render` again so shots land in the same HTML report.
+
+| `expects.kind` | Field | Pass when |
+| --- | --- | --- |
+| `seeText` | `text` | Visible page text contains the needle |
+| `noText` | `text` | Needle is absent |
+| `urlIncludes` | `text` | Current URL contains the needle |
+| `titleIncludes` | `text` | Document title contains the needle |
+| `visible` | `selector` | Element is visible |
+| `hidden` | `selector` | Element is missing or not visible |
+| `noConsoleError` | (none) | No `console.error` / `pageerror`. Without this kind, console noise is `warn` |
+
+Steps: `fill`, `click`, `wait` (`selector` or `urlIncludes`). Empty expect text is a fail.
+
+Viewports: `desktop` (1440x900) default, optional `mobile` (390x844). Each viewport is its own case (`ui-desktop`, `ui-mobile`). Screenshots are embedded as `data:image/png` so the HTML file moves alone. The MCP reply slims shots (counts only); full images stay on the run for `render`.
+
+Do not invent a page URL. Only open the URL you gave.
+
+### 4. Standalone MCP
+
+```bash
+cd plugins/test-them && npm start
+```
+
+Stdio server. Hosts normally start this via `bin/run.sh`.
 
 ## How it works
 
@@ -152,7 +248,7 @@ Pass `families` on `diagnose` to run a subset.
 | `diagnose` | Seed + matrix. Live only |
 | `auth_from` | Copy a token from a prior case into `Authorization` |
 | `render` | Write `templates/report.html` filled with the last Run |
-| `ui_probe` | Playwright flow. Only when the user named a page |
+| `ui_probe` | Live page. `expects` + optional `viewports`. Only when you named a page |
 
 Standalone MCP (stdio):
 
@@ -192,12 +288,13 @@ plugins/test-them/assets/logo-mark.png   # icon only
 ```bash
 cd plugins/test-them
 npm install
+npm test
 npm run check
 ```
 
-`npm run check` starts a local echo login server, runs the matrix, asserts redaction + English copy + logo embed, writes `reports/self-check.html`.
+`npm test` runs the UI expect matcher (no browser). `npm run check` starts a local echo login server, runs the matrix, asserts redaction + English copy + logo embed, writes `reports/self-check.html`. If Playwright is installed it also probes `fixtures/ui-page.html`; otherwise `ui: "skipped"`.
 
-Node 18+. No extra test runner.
+Node 18+. Matcher tests use `node --test`.
 
 ## Layout
 
