@@ -138,7 +138,12 @@ try {
     if (bad[0].verdict !== "fail") throw new Error("missing text must fail");
     uiStatus = "ran";
   } catch (err) {
-    if (String(err.message || err).includes("Playwright not installed")) {
+    const msg = String(err.message || err);
+    if (
+      msg.includes("Playwright not installed")
+      || msg.includes("browserType.launch")
+      || msg.includes("Executable doesn't exist")
+    ) {
       uiStatus = "skipped";
     } else {
       throw err;

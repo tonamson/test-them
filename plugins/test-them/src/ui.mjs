@@ -1,5 +1,3 @@
-import { mkdir, readFile } from "node:fs/promises";
-import path from "node:path";
 import { evaluateExpects } from "./ui-expect.mjs";
 
 export const VIEWPORTS = {
@@ -51,9 +49,6 @@ function selectorsFrom(steps, expects) {
   }
   for (const step of steps || []) {
     if (step.selector) out.add(step.selector);
-    for (const exp of step.expects || []) {
-      if (exp.selector) out.add(exp.selector);
-    }
   }
   return [...out];
 }
@@ -89,72 +84,79 @@ async function runOneViewport(browser, input, name) {
   const t0 = performance.now();
 
   try {
-    await page.goto(input.url, { waitUntil: "domcontentloaded", timeout: 20000 });
-    screenshots.push({ step: "open", src: await shotData(page) });
+    try {
+      await page.goto(input.url, { waitUntil: "domcontentloaded", timeout: 20000 });
+      screenshots.push({ step: "open", src: await shotData(page) });
 
-    for (const [index, step] of steps.entries()) {
-      const action = step.action;
-      if (action === "fill") await page.fill(step.selector, String(step.value ?? ""));
-      else if (action === "click") await page.click(step.selector);
-      else if (action === "wait" && step.urlIncludes) {
-        await page.waitForURL((href) => href.includes(step.urlIncludes), { timeout: 15000 });
-      } else if (action === "wait" && step.selector) {
-        await page.waitForSelector(step.selector, { timeout: 15000 });
-      } else if (action === "expect") {
-        // no interaction; snapshot later
-      } else {
-        throw new Error(`unknown ui step ${action}`);
+      for (const step of steps) {
+        const action = step.action;
+        if (action === "fill") await page.fill(step.selector, String(step.value ?? ""));
+        else if (action === "click") await page.click(step.selector);
+        else if (action === "wait" && step.urlIncludes) {
+          await page.waitForURL((url) => url.href.includes(step.urlIncludes), { timeout: 15000 });
+        } else if (action === "wait" && step.selector) {
+          await page.waitForSelector(step.selector, { timeout: 15000 });
+        } else if (action === "expect") {
+          // no interaction; snapshot later
+        } else {
+          throw new Error(`unknown ui step ${action}`);
+        }
+        screenshots.push({ step: action, src: await shotData(page) });
       }
-      screenshots.push({ step: action, src: await shotData(page) });
+    } catch (err) {
+      lastError = err.message;
     }
-  } catch (err) {
-    lastError = err.message;
+
+    const snap = lastError
+      ? { url: input.url, title: "", text: "", visible: [], hidden: [], consoleErrors: page.__consoleErrors }
+      : await snapshot(page, selectorsFrom(steps, expects));
+    snap.consoleErrors = page.__consoleErrors;
+
+    const judged = lastError
+      ? { hits: [], misses: [], unexpected: { kind: "playwright", text: lastError } }
+      : evaluateExpects(snap, expects);
+    const consoleWarn = !lastError
+      && !expects.some((e) => e.kind === "noConsoleError")
+      && snap.consoleErrors.length > 0;
+    let verdict = "pass";
+    let reason = "UI steps completed";
+    if (lastError) {
+      verdict = "fail";
+      reason = lastError;
+    } else if (judged.misses.length) {
+      verdict = "fail";
+      reason = judged.unexpected.text;
+    } else if (consoleWarn) {
+      verdict = "warn";
+      reason = `console: ${snap.consoleErrors[0]}`;
+    }
+
+    return {
+      id: `ui-${name}`,
+      family: "ui",
+      title: lastError ? `UI failed (${name})` : `UI flow (${name})`,
+      scenario: `Live ${name} page ${input.url}`,
+      purpose: "Verify the live page matches written UI expects.",
+      expectedText: expectedText(expects),
+      unexpected: lastError ? { kind: "playwright", text: lastError } : judged.unexpected,
+      live: true,
+      startedAt,
+      elapsedMs: Math.round(performance.now() - t0),
+      request: { method: "GET", url: input.url, headers: {}, body: { steps, expects, viewport: name } },
+      response: {
+        status: lastError ? 0 : 200,
+        headers: {},
+        error: lastError,
+        body: { url: snap.url, title: snap.title, consoleErrors: snap.consoleErrors },
+      },
+      verdict,
+      reason,
+      screenshots,
+      uiExpects: { hits: judged.hits, misses: judged.misses },
+    };
+  } finally {
+    await page.close();
   }
-
-  const snap = lastError
-    ? { url: input.url, title: "", text: "", visible: [], hidden: [], consoleErrors: page.__consoleErrors }
-    : await snapshot(page, selectorsFrom(steps, expects));
-  snap.consoleErrors = page.__consoleErrors;
-  await page.close();
-
-  const judged = evaluateExpects(snap, expects);
-  const consoleWarn = !expects.some((e) => e.kind === "noConsoleError") && snap.consoleErrors.length > 0;
-  let verdict = "pass";
-  let reason = "UI steps completed";
-  if (lastError) {
-    verdict = "fail";
-    reason = lastError;
-  } else if (judged.misses.length) {
-    verdict = "fail";
-    reason = judged.unexpected.text;
-  } else if (consoleWarn) {
-    verdict = "warn";
-    reason = `console: ${snap.consoleErrors[0]}`;
-  }
-
-  return {
-    id: `ui-${name}`,
-    family: "ui",
-    title: lastError ? `UI failed (${name})` : `UI flow (${name})`,
-    scenario: `Live ${name} page ${input.url}`,
-    purpose: "Verify the live page matches written UI expects.",
-    expectedText: expectedText(expects),
-    unexpected: lastError ? { kind: "playwright", text: lastError } : judged.unexpected,
-    live: true,
-    startedAt,
-    elapsedMs: Math.round(performance.now() - t0),
-    request: { method: "GET", url: input.url, headers: {}, body: { steps, expects, viewport: name } },
-    response: {
-      status: lastError ? 0 : 200,
-      headers: {},
-      error: lastError,
-      body: { url: snap.url, title: snap.title, consoleErrors: snap.consoleErrors },
-    },
-    verdict,
-    reason,
-    screenshots,
-    uiExpects: { hits: judged.hits, misses: judged.misses },
-  };
 }
 
 export async function uiProbe(input = {}) {

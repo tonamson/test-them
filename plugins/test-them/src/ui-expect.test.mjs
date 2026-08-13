@@ -56,3 +56,9 @@ test("empty expects is a clean hit list", () => {
   assert.equal(out.misses.length, 0);
   assert.equal(out.unexpected, null);
 });
+
+test("empty seeText is a miss", () => {
+  const out = evaluateExpects(snap, [{ kind: "seeText", text: "" }]);
+  assert.equal(out.misses.length, 1);
+  assert.equal(out.misses[0].detail, "empty expect text");
+});

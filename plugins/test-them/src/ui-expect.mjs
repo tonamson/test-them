@@ -12,10 +12,26 @@ function hasText(hay, needle) {
   return String(hay || "").includes(String(needle || ""));
 }
 
+function emptyNeedle(exp) {
+  return exp?.text == null || String(exp.text).length === 0;
+}
+
+function emptySelector(exp) {
+  return exp?.selector == null || String(exp.selector).length === 0;
+}
+
 function checkOne(snapshot, exp) {
   const kind = exp?.kind;
   if (!KINDS.has(kind)) {
     return { ok: false, kind, detail: `unknown expect ${kind}` };
+  }
+  if (kind === "seeText" || kind === "noText" || kind === "urlIncludes" || kind === "titleIncludes") {
+    if (emptyNeedle(exp)) {
+      return { ok: false, kind, detail: "empty expect text" };
+    }
+  }
+  if ((kind === "visible" || kind === "hidden") && emptySelector(exp)) {
+    return { ok: false, kind, detail: "empty expect text" };
   }
   if (kind === "seeText") {
     const ok = hasText(snapshot.text, exp.text);

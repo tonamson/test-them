@@ -191,23 +191,6 @@ server.tool(
           selector: z.string().optional(),
           value: z.string().optional(),
           urlIncludes: z.string().optional(),
-          expects: z
-            .array(
-              z.object({
-                kind: z.enum([
-                  "seeText",
-                  "noText",
-                  "urlIncludes",
-                  "titleIncludes",
-                  "visible",
-                  "hidden",
-                  "noConsoleError",
-                ]),
-                text: z.string().optional(),
-                selector: z.string().optional(),
-              }),
-            )
-            .optional(),
         }),
       )
       .optional(),
@@ -246,7 +229,17 @@ server.tool(
           }
         }
       }
-      return ok({ attached: Boolean(session.lastRun && input.attach !== false), cases });
+      const slim = cases.map(({ screenshots, ...rest }) => ({
+        ...rest,
+        screenshots: (screenshots || []).map((s) => ({
+          step: s.step,
+          bytes: s.src ? Buffer.byteLength(s.src) : 0,
+        })),
+      }));
+      return ok({
+        attached: Boolean(session.lastRun && input.attach !== false),
+        cases: slim,
+      });
     } catch (err) {
       return fail(err);
     }
