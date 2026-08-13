@@ -1,0 +1,22 @@
+{
+  "name": "test-them",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Live HTTP API tester with a fail-first HTML report for AI agents.",
+  "bin": {
+    "test-them": "./src/server.mjs"
+  },
+  "scripts": {
+    "start": "node src/server.mjs",
+    "test": "node --test src/ui-expect.test.mjs",
+    "check": "node --test src/ui-expect.test.mjs && node src/self-check.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.4",
+    "zod": "^3.24.2"
+  }
+}
