@@ -1,0 +1,8 @@
+{
+  "name": "test-them",
+  "version": "0.1.0",
+  "description": "Professional live API tester. Diagnose an endpoint and write a fail-first HTML report. Use when testing APIs, probing endpoints, or writing an HTML test report.",
+  "author": {
+    "name": "test them"
+  }
+}

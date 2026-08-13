@@ -1,2 +1,8 @@
 # Added by code-review-graph
 .code-review-graph/
+node_modules/
+plugins/*/node_modules/
+plugins/*/tmp/
+.DS_Store
+reports/
+

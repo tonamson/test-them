@@ -16,12 +16,6 @@
   <img alt="hosts" src="https://img.shields.io/badge/Grok%20%7C%20Claude%20Code%20%7C%20Codex-111111">
 </p>
 
-Marketplace plugin: **skill + MCP + one HTML template**. Any HTTP API. Live traffic only.
-
-Package id: `test-them`. Report brand: **test them**. Repo: [`tonamson/test-it`](https://github.com/tonamson/test-it).
-
----
-
 ## What this is
 
 An agent asks **test them** to probe a real URL. The MCP server sends the request you named, then a matrix of validation / auth / protocol / contract cases against that same URL. Every case is a live `fetch`. The result is a standalone HTML report with pass/fail first, redacted wire, and a brand stamp.

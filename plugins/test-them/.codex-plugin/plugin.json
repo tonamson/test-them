@@ -1,0 +1,16 @@
+{
+  "name": "test-them",
+  "version": "0.1.0",
+  "description": "Professional live API tester. Diagnose an endpoint and write a fail-first HTML report.",
+  "author": {
+    "name": "test them"
+  },
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "test them",
+    "shortDescription": "Live API tests and HTML reports",
+    "category": "Productivity",
+    "capabilities": ["Read", "Write"]
+  }
+}

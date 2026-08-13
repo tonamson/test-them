@@ -1,0 +1,6 @@
+{
+  "test-them": {
+    "command": "sh",
+    "args": ["${CLAUDE_PLUGIN_ROOT}/bin/run.sh"]
+  }
+}

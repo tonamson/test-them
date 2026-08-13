@@ -1,0 +1,18 @@
+{
+  "name": "test-them",
+  "description": "Live API tester with a fail-first HTML report",
+  "owner": {
+    "name": "test them"
+  },
+  "plugins": [
+    {
+      "name": "test-them",
+      "description": "Professional live API tester. Diagnose an endpoint and write a fail-first HTML report.",
+      "category": "testing",
+      "source": {
+        "type": "local",
+        "path": "./plugins/test-them"
+      }
+    }
+  ]
+}
